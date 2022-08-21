@@ -1,7 +1,7 @@
 const express = require('express');
 require('dotenv').config();
 const app = express();
-const port = 5001;
+const port = process.env.PORT || 5000;
 
 app.get('/', function (req, res) {
     const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
