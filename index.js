@@ -2,10 +2,19 @@ const express = require('express');
 const fs = require('fs');
 const axios = require('axios').default;
 const cheerio = require('cheerio')
+const cors = require('cors');
 require('dotenv').config();
 const https = require('https');
 
 const app = express();
+
+var corsOptions = {
+  origin: 'http://localhost:4200',
+  optionsSuccessStatus: 200
+}
+
+app.use(cors(corsOptions));
+
 const port = process.env.PORT || 3000;
 
 const url = "https://real-time-google-search.p.rapidapi.com/search?q="
@@ -62,13 +71,27 @@ app.get('/:query',  async (req, response) => {
     // console.log(jsonData.data.image_results)
     let urlCount = 0
     jsonData.data.image_results.forEach(async (element) => {
+      console.log("trying", element.source)
       const { data } = await axios.get(element.source);
       const $ = cheerio.load(data);
+      // if(element.source == 'https://www.freefavicon.com/freefavicons/animal/iconinfo/cat--5-152-85909.html'){
+      //   console.log($('img'))
+      // }
       for (const source of $('img')) {
-        if (source.attribs.src.startsWith('http')) {
-          imageSources.push(source.attribs.src);
-          break;
-        } 
+        if(!source.attribs.src.includes("logo") && !source.attribs.src.includes("Logo")){
+          if (source.attribs.src.includes("cat") || source.attribs.src.includes("Cat")) {
+            if (source.attribs.src.includes(".com")) {
+              if (source.attribs.src.startsWith('http')) {
+                imageSources.push(source.attribs.src);
+                break;
+              }
+              if(source.attribs.src.startsWith('//')){
+                imageSources.push(source.attribs.src.replace('//', 'http://'));
+                break;
+              }
+            }
+          }
+        }
       }
       urlCount += 1
       
@@ -85,11 +108,18 @@ app.get('/:query',  async (req, response) => {
     console.log("urlCount", urlCount)
     console.log("imageSources.length", imageSources.length)
     
+    imageSources = [...new Set(imageSources)];
+
     imageSources.forEach( async (element) => {
       console.log("getting",element);
-      let image = await axios.get(element, {responseType: 'arraybuffer'});
-      let returnedB64 = Buffer.from(image.data).toString('base64');
-      jsonData['imagesProcessed'].push(returnedB64);
+      axios.get(element, {responseType: 'arraybuffer'}).then((image)=>{
+        let returnedB64 = Buffer.from(image.data).toString('base64');
+        jsonData['imagesProcessed'].push(returnedB64);
+      }).catch(error => {
+        console.error(error.response);
+        jsonData['imagesProcessed'].push(error.response);
+    });
+      
     })
     
     
